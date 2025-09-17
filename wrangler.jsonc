@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "verseventure",
+  "compatibility_date": "2024-01-01",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  
+  // D1 Database for storing verses, adventures, and user progress
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "verseventure-production",
+      "database_id": "placeholder-will-be-created"
+    }
+  ],
+  
+  // KV Storage for session data and temporary storage
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "placeholder-will-be-created",
+      "preview_id": "placeholder-will-be-created"
+    }
+  ]
+}
