@@ -191,20 +191,86 @@ app.post('/api/progress', async (c) => {
   }
 });
 
+// API route to create a new user (defaults to parent)
+app.post('/api/users', async (c) => {
+  const { env } = c;
+  const { username, email, displayName, avatarUrl } = await c.req.json();
+
+  if (!username) {
+    return c.json({ success: false, error: 'Username is required' }, 400);
+  }
+
+  try {
+    const result = await env.DB.prepare(
+      'INSERT INTO users (username, email, display_name, avatar_url, role) VALUES (?, ?, ?, ?, ?)'
+    ).bind(username, email, displayName, avatarUrl, 'parent').run();
+
+    return c.json({ success: true, userId: result.meta.last_row_id });
+  } catch (error: any) {
+    console.error('Failed to create user:', error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      return c.json({ success: false, error: 'Username or email already taken' }, 409);
+    }
+    return c.json({ success: false, error: 'Failed to create user' }, 500);
+  }
+});
+
+// API route for a parent to create a child account
+app.post('/api/users/child', async (c) => {
+  const { env } = c;
+  const { parentId, username, displayName, email, avatarUrl } = await c.req.json();
+
+  if (!parentId || !username) {
+    return c.json({ success: false, error: 'Parent ID and username are required' }, 400);
+  }
+
+  try {
+    // Verify the parent exists and is a 'parent'
+    const parent = await env.DB.prepare(
+      'SELECT * FROM users WHERE id = ? AND role = ?'
+    ).bind(parentId, 'parent').first();
+
+    if (!parent) {
+      return c.json({ success: false, error: 'Invalid parent account' }, 403);
+    }
+
+    // Create the child user
+    const result = await env.DB.prepare(
+      'INSERT INTO users (username, display_name, email, avatar_url, role, parent_id) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(username, displayName, email, avatarUrl, 'child', parentId).run();
+
+    return c.json({ success: true, userId: result.meta.last_row_id });
+  } catch (error: any) {
+    console.error('Failed to create child account:', error);
+    if (error.message.includes('UNIQUE constraint failed')) {
+      return c.json({ success: false, error: 'Username or email already taken' }, 409);
+    }
+    return c.json({ success: false, error: 'Failed to create child account' }, 500);
+  }
+});
+
 // API route to get user stats
 app.get('/api/users/:id/stats', async (c) => {
   const { env } = c;
   const userId = c.req.param('id');
-  
+  const requestingUserId = c.req.query('requestingUserId');
+
   try {
     const user = await env.DB.prepare(
       'SELECT * FROM users WHERE id = ?'
-    ).bind(userId).first();
+    ).bind(userId).first<any>();
     
     if (!user) {
       return c.json({ success: false, error: 'User not found' }, 404);
     }
-    
+
+    // Authorization: allow if the requesting user is the user themselves, or their parent.
+    if (requestingUserId) {
+      if (user.id !== parseInt(requestingUserId) && user.parent_id !== parseInt(requestingUserId)) {
+        return c.json({ success: false, error: 'Unauthorized' }, 403);
+      }
+    }
+
     // Get progress stats
     const progressStats = await env.DB.prepare(`
       SELECT 
@@ -232,6 +298,38 @@ app.get('/api/users/:id/stats', async (c) => {
     });
   } catch (error) {
     return c.json({ success: false, error: 'Failed to fetch user stats' }, 500);
+  }
+});
+
+// API route to get current user's profile and children
+app.get('/api/users/me', async (c) => {
+  const { env } = c;
+  const userId = c.req.query('userId');
+
+  if (!userId) {
+    return c.json({ success: false, error: 'User ID is required' }, 400);
+  }
+
+  try {
+    const user = await env.DB.prepare(
+      'SELECT * FROM users WHERE id = ?'
+    ).bind(userId).first<any>();
+
+    if (!user) {
+      return c.json({ success: false, error: 'User not found' }, 404);
+    }
+
+    let children = [];
+    if (user.role === 'parent') {
+      const childrenResult = await env.DB.prepare(
+        'SELECT id, username, display_name, avatar_url, total_points FROM users WHERE parent_id = ?'
+      ).bind(userId).all();
+      children = childrenResult.results;
+    }
+
+    return c.json({ success: true, user, children });
+  } catch (error) {
+    return c.json({ success: false, error: 'Failed to fetch user profile' }, 500);
   }
 });
 

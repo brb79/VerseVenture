@@ -1,0 +1,3 @@
+d1_databases = [
+  { binding = "DB", database_name = "verseventure-production", database_id = "placeholder-will-be-created" }
+]
