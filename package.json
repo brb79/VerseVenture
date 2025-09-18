@@ -1,6 +1,7 @@
 {
   "name": "verseventure",
   "version": "1.0.0",
+  "type": "module",
   "description": "Bible Adventure App - Interactive scripture learning platform",
   "scripts": {
     "dev": "vite",
@@ -29,6 +30,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "4.20250705.0",
     "@hono/vite-cloudflare-pages": "^0.4.2",
+    "@hono/vite-dev-server": "^0.21.0",
+    "miniflare": "^4.20250917.0",
     "typescript": "^5.0.0",
     "vite": "^5.0.0",
     "wrangler": "^3.78.0"
